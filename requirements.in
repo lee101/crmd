@@ -1,0 +1,5 @@
+typer[all]
+pyyaml
+rich
+textual
+openai
