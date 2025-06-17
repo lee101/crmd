@@ -162,9 +162,16 @@ set.
 
 For a quick visual overview, open `index.html` in your browser to see a minimal demo site styled like a terminal.
 
+## Implemented nice-to-haves
+
+- Mobile-friendly shell wrapper (`crmd mobile-shell`)
+- Voice note recording (`crmd record-voice NAME`)
+- Local search index (`crmd build-index` and `crmd fast-search`)
+- Contact deduplication suggestions (`crmd dedupe`)
+
 ## Next nice-to-haves
 
-- Mobile-friendly shell wrapper
-- Voice note recording
-- Local search index for speed
-- Contact deduplication suggestions
+- Basic web helper command
+- Improved mobile UI theme
+- Automated voice transcription
+- Cloud indexing for multi-device search

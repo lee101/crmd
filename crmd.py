@@ -19,6 +19,7 @@ import time
 import re
 import subprocess
 from collections import defaultdict
+from difflib import SequenceMatcher
 
 try:
     import openai
@@ -769,6 +770,90 @@ def list_tags():
         tags.update(c.get("tags", []))
     for t in sorted(tags):
         print(t)
+
+
+@app.command("web")
+def open_web():
+    """Open the bundled index.html in a browser."""
+    html = Path(__file__).with_name("index.html").resolve()
+    webbrowser.open(str(html))
+
+
+@app.command("mobile-shell")
+def mobile_shell():
+    """Minimal interactive shell for mobile devices."""
+    while True:
+        cmd = Prompt.ask("crmd>")
+        if not cmd or cmd.lower() in {"exit", "quit", "q"}:
+            break
+        try:
+            app(cmd.split())
+        except SystemExit:
+            continue
+
+
+@app.command("record-voice")
+def record_voice(name: str, seconds: int = typer.Option(5, "--seconds", "-s")):
+    """Record a short voice note and attach to NAME."""
+    rec = _load(name)
+    path = data_dir() / f"{name.replace(' ', '_')}_{int(time.time())}.wav"
+    subprocess.run(["sox", "-d", str(path), "trim", "0", str(seconds)], check=False)
+    rec.setdefault("voice_notes", []).append(str(path))
+    _save(rec)
+    print(f"[green]✓ voice note saved to {path}")
+
+
+def _index_file() -> Path:
+    return data_dir() / "search_index.json"
+
+
+@app.command("build-index")
+def build_index():
+    """Create a simple word->contact search index."""
+    idx = defaultdict(set)
+    for f in data_dir().glob("*.yaml"):
+        c = yaml.safe_load(f.read_text())
+        tokens = [c["name"]]
+        tokens.extend(c.get("tags", []))
+        tokens.append(c.get("email", ""))
+        for i in c.get("interactions", []):
+            tokens.extend(i.get("summary", "").split())
+        for t in tokens:
+            t = t.lower()
+            if t:
+                idx[t].add(c["name"])
+    _index_file().write_text(json.dumps({k: sorted(v) for k, v in idx.items()}, indent=2))
+    print("[green]✓ index built")
+
+
+@app.command("fast-search")
+def fast_search(word: str):
+    """Search contacts using the local index."""
+    if not _index_file().exists():
+        print("[red]Index not built")
+        raise typer.Exit(1)
+    idx = json.loads(_index_file().read_text())
+    for name in idx.get(word.lower(), []):
+        print(name)
+
+
+@app.command()
+def dedupe(threshold: float = typer.Option(0.8, "--threshold")):
+    """Suggest duplicate contacts."""
+    contacts = []
+    for f in data_dir().glob("*.yaml"):
+        c = yaml.safe_load(f.read_text())
+        contacts.append((c["name"], c.get("email", "")))
+    for i, (n1, e1) in enumerate(contacts):
+        for n2, e2 in contacts[i + 1 :]:
+            if e1 and e1 == e2:
+                print(f"{n1} <-> {n2} (same email)")
+            else:
+                if (
+                    SequenceMatcher(None, n1.lower(), n2.lower()).ratio()
+                    >= threshold
+                ):
+                    print(f"{n1} <-> {n2} (name match)")
 
 
 def worker_cmd():
